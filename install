@@ -1,0 +1,62 @@
+#!/bin/bash
+
+BM_ROOT=$(pwd)
+
+if [ -e $BM_ROOT/.setup_stamp ]; then
+	echo "Already initialized."
+	exit 0
+fi
+
+if [ ! -e /opt/ros/indigo/setup.zsh ]; then
+	sudo ./sandbox/install_ros.bash
+fi
+
+
+source /opt/ros/indigo/setup.zsh
+
+# mkdir sandbox
+# wget https://bintray.com/artifact/download/ros/ros/ros-system-daemon_0.1.1-18_all.deb -O sandbox/ros-system-daemon_0.1.1-18_all.deb
+sudo dpkg -i sandbox/ros-system-daemon_0.1.1-18_all.deb
+#https://github.com/mikepurvis/ros-system-daemon
+
+cd $BM_ROOT/ros_packages/src
+catkin_init_workspace
+cd $BM_ROOT/ros_packages
+catkin_make
+cd $BM_ROOT
+
+sudo update-alternatives --install /etc/ros/setup.sh ros-setup ${BM_ROOT}/ros_packages/devel/setup.sh 20
+sudo update-alternatives --install /etc/ros/robot.launch ros-robot-launch ${BM_ROOT}/ros_packages/launch/startup.launch 20
+
+
+case $(basename $SHELL) in
+	"zsh")
+		echo "zsh config"
+		echo "" >> ~/.zshrc
+		echo "#ROS" >> ~/.zshrc
+		echo "source /opt/ros/indigo/setup.zsh" >> ~/.zshrc
+		echo "source $BM_ROOT/ros_packages/devel/setup.zsh" >> ~/.zshrc
+		echo "ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:$BM_ROOT/ros_packages" >> ~/.zshrc
+		;;
+	"bash")
+		echo "bash config"
+		echo "" >> ~/.bashrc
+		echo "#ROS" >> ~/.bashrc
+		echo "source /opt/ros/indigo/setup.bash" >> ~/.bashrc
+		echo "source $BM_ROOT/ros_packages/devel/setup.bash" >> ~/.bashrc
+		echo "ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:$BM_ROOT/ros_packages" >> ~/.bashrc
+		;;
+	"sh")
+		echo "sh config -- is there really a shrc here?"
+		echo "" >> ~/.shrc
+		echo "#ROS" >> ~/.shrc
+		echo "source /opt/ros/indigo/setup.sh" >> ~/.shrc
+		echo "source $BM_ROOT/ros_packages/devel/setup.sh" >> ~/.shrc
+		echo "ROS_PACKAGE_PATH=\$ROS_PACKAGE_PATH:$BM_ROOT/ros_packages" >> ~/.shrc
+		;;
+	*)
+		echo "WTF?"
+		echo "Shell: $(basename $SHELL)"
+		exit -1
+		;;
+esac
