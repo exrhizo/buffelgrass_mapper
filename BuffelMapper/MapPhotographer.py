@@ -15,17 +15,10 @@ import time
 from droneapi.lib import VehicleMode
 from pymavlink import mavutil
 
-PARSER = argparse.ArgumentParser(
-    description='Collect photographs and create GPX file for stitching.')
-PARSER.add_argument('output_file', help='Output directory for images and GPX.')
-PARSER.add_argument('-f', '-frequency', dest='frequency', type=float, default=.5,
-    help='Number of pictures saved per second.')
-PARSER.add_argument('-width', dest='width', type=int, default=640,
-    help='Width of the photographs.')
-PARSER.add_argument('-height', dest='height', type=int, default=480,
-    help='Height of the photographs.')
+import cPickle as pickle
 
-
+import cv2
+import numpy as np
 
 ################################################################################
 
@@ -78,6 +71,7 @@ class Gpx:
         if load:
             print "ERROR: loading from a file has not been implemented."
         self.gpx_file = gpx_file
+        self.pkl_file = gpx_file+".pkl"
         self.track_points = []
 
     def addTrackPoint(self, point):
@@ -86,6 +80,8 @@ class Gpx:
     def save(self):
         with open(self.gpx_file, 'w') as f:
             f.write(str(self))
+        with open(self.pkl_file, 'wb') as f:
+            f.write(pickle.dumps(self))
 
     def __str__(self):
         return self.GPX_BEGIN + \
@@ -94,18 +90,18 @@ class Gpx:
 
 
 
-
-def main(api, output_file="test.gpx", frequency=1,
+def main(api, output_dir=".", frequency=1,
             width=640, height=480):
     # get our vehicle - when running with mavproxy it only knows about one vehicle (for now)
-    print "RUNNING MAP PHOTOGRAPHER"
+    print "RUNNING MapPhotographer.py"
     v = api.get_vehicles()[0]
 
-    gpx = Gpx(output_file)
-    # gpx.addTrackPoint(Gpx.TrackPoint(0,6,7,1,2,3))
-    # gpx.addTrackPoint(Gpx.TrackPoint(0,6,7,1,2,3))
-    # print str(gpx)
-    # gpx.save()
+    gpx = Gpx(output_dir+"/flight.gpx")
+
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, height)
+
     time_step = 1.0 / frequency
     last_update = time.time() - time_step #don't trigger warning
     count = 0
@@ -122,7 +118,16 @@ def main(api, output_file="test.gpx", frequency=1,
             print "REQUESTED TIMESTEP: %f" % time_step
             print "ACTUAL STEP:        %f" % time_diff
 
+        ret, frame = cap.read()
+        cv2.imwrite("{}/photo{}.jpg".format(output_dir, count), frame);
 
+        #convert
+        #lon Decimal degrees
+        #lat Decimal degrees
+        #ele meters
+        #time is correct
+        #course to degrees
+        #speed m/s
         gpx.addTrackPoint(Gpx.TrackPoint({
             'lon':v.location.lon,
             'lat':v.location.lat,
@@ -134,17 +139,8 @@ def main(api, output_file="test.gpx", frequency=1,
 
         #End of Loop time and count
         count += 1
-        if count > 10:
-            break
+        if count%10:
+            gpx.save()
         last_update = now
+    cap.release()
     gpx.save()
-
-
-print __name__
-if __name__ == '__main__':
-    args = PARSER.parse_args()
-
-    # First get an instance of the API endpoint
-    api = local_connect()
-
-    main(api, vehicle, **vars(args))
