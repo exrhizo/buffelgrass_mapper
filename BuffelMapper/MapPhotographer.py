@@ -43,29 +43,7 @@ class Gpx:
     GPX_END = """</trkseg>
 </trk>
 </gpx>
-"""
-    class TrackPoint:
-        """
-        A simple GPX track point. Used for recording a path taken.
-        """
-        GPX_TRACK_POINT = """<trkpt lat="{lat}" lon="{lon}">
-  <ele>{ele}</ele>
-  <time>{time}</time>
-  <course>{course}</course>
-  <speed>{speed}</speed>
-  <fix>3d</fix>
-</trkpt>
-"""
-        def __init__(self, args):
-            self.lon = args["lon"]
-            self.lat = args["lat"]
-            self.ele = args["ele"]
-            self.time = args["time"]
-            self.course = args["course"]
-            self.speed = args["speed"]
-        def __str__(self):
-            return self.GPX_TRACK_POINT.format(**self.__dict__)
-        
+""" 
 
     def __init__(self, gpx_file, load=False):
         if load:
@@ -87,6 +65,34 @@ class Gpx:
         return self.GPX_BEGIN + \
                 ''.join([str(p) for p in self.track_points]) + \
                 self.GPX_END
+
+    def fixPoints(self):
+        for point in self.track_points:
+            point.course = point.course * 57.2957795
+
+
+class TrackPoint:
+    """
+    A simple GPX track point. Used for recording a path taken.
+    """
+    GPX_TRACK_POINT = """<trkpt lat="{lat}" lon="{lon}">
+  <ele>{ele}</ele>
+  <time>{time}</time>
+  <compass>{course}</compass>
+  <speed>{speed}</speed>
+  <fix>3d</fix>
+</trkpt>
+"""
+    def __init__(self, args):
+        self.lon = args["lon"]
+        self.lat = args["lat"]
+        self.ele = args["ele"]
+        self.time = args["time"]
+        self.course = args["course"]
+        self.speed = args["speed"]
+
+    def __str__(self):
+        return self.GPX_TRACK_POINT.format(**self.__dict__)
 
 
 
@@ -128,7 +134,7 @@ def main(api, output_dir=".", frequency=1,
         #time is correct
         #course to degrees
         #speed m/s
-        gpx.addTrackPoint(Gpx.TrackPoint({
+        gpx.addTrackPoint(TrackPoint({
             'lon':v.location.lon,
             'lat':v.location.lat,
             'ele':v.location.alt,
