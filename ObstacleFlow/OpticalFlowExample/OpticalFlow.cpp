@@ -1,5 +1,6 @@
 /* --Sparse Optical Flow Demo Program--
  * Updated based on code written by David Stavens (dstavens@robotics.stanford.edu)
+ * http://robots.stanford.edu/cs223b05/notes/CS%20223-B%20T1%20stavens_opencv_optical_flow.pdf
  */
 
 #include "opencv2/opencv.hpp"
@@ -17,7 +18,7 @@ using namespace cv;
 inline static void allocateOnDemand( Mat **img, Size size, int depth, int channels)
 {
     if ( *img != NULL ) return;
-   // *img.create( size, depth, channels );
+    //*img=create( size, depth, channels );
     if ( *img == NULL )
     {
         fprintf(stderr, "Error: Couldn't allocate image. Out of memory?\n");
@@ -95,8 +96,100 @@ int main( int argc, char** argv )
          * Image has ONE challenge of color (ie: monochrome) with 8-bit "color" depth.
          * This is the image format OpenCV algorithms actually operate on (mostly).
          */
-        allocateOnDemand( &frame1_1C, frame_size, CV_8U, 1 );
-    
+        //probably take out allocate on demand in favor of making a Mat image with constructor
+        //allocateOnDemand( &frame1_1C, frame_size, CV_8U, 1 );
+        frame1_1C->create(frame_size, CV_8U);
+        /* Convert whatever the AVI image format is into OpenCV's preferred format.
+         * AND flip the image vertically. Flip is a shameless hack. OpenCV reads
+         * in AVIs upside-down by default. (No comment :-))
+         */
+        
+        //change cvConvertImage to flip
+        cv::flip(*frame, *frame1_1C, 0);
+        
+        /* We'll make a full color backup of this frame so that we can draw on it.
+         * (It's not the best idea to draw on the static memory space of cvQueryFrame().)
+         */
+        frame1->create(frame_size, CV_8U);
+        cv::flip(*frame, *frame1, 0);
+        
+        /* Get the second frame of video. Sample principles as the first. */
+        //changed cvQueryFrame to input_video >> *frame, followed frame1_1C procedure
+        input_video >> *frame;
+        if (frame == NULL)
+        {
+            fprintf(stderr, "Error: Hmm. The end came sooner than we thought.\n");
+            return -1;
+        }
+        frame2_1C->create(frame_size, CV_8U );
+        cv::flip(*frame, *frame2_1C, 0);
+        
+        /* Shi and Tomasi Feature Tracking! */
+        /* Preparation: Allocate the necessary storage. */
+        //change allocateOnDemand to ->create
+        eig_image->create(frame_size, CV_32F);
+        temp_image->create( frame_size, CV_32F);
+        
+        /* Preparation: This array will contain the features found in frame 1. */
+        Point frame1_features[400];
+        
+        /* Preparation: BEFORE the function call this variable is the array size
+         * (or the maximum number of features to find). AFTER the function call
+         * this variable is the number of features actually found.
+         */
+        int number_of_features;
+        
+        /* I'm hardcoding this at 400. But you should make this a #define so that you can
+         * change the number of features you use for an accuracy/speed tradeoff analysis.
+         */
+        number_of_features = 400;
+        
+        /* Actually run the Shi and Tomasi algorithm!!
+         * "frame1_1C" is the input image.
+         * "eig_image" and "temp_image" are just workspace for the algorithm.
+         * The first ".01" specifies the minimum quality of the features (based on the
+         eigenvalues).
+         * The second ".01" specifies the minimum Euclidean distance between features.
+         * "NULL" means use the entire input image. You could point to a part of the
+         image.
+         * WHEN THE ALGORITHM RETURNS:
+         * "frame1_features" will contain the feature points.
+         * "number_of_features" will be set to a value <= 400 indicating the number of
+         feature points found.
+         */
+        goodFeaturesToTrack(frame1_1C, frame1_features, number_of_features, .01, .01);
+        
+        /* Pyramidal Lucas Kanade Optical Flow! */
+        /* This array will contain the locations of the points from frame 1 in frame 2. */
+        Point frame2_features[400];
+        
+        /* The i-th element of this array will be non-zero if and only if the i-th feature
+         of
+         * frame 1 was found in frame 2.
+         */
+        char optical_flow_found_feature[400];
+        
+        /* The i-th element of this array is the error in the optical flow for the i-th
+         feature
+         * of frame1 as found in frame 2. If the i-th feature was not found (see the
+         array above)
+         * I think the i-th entry in this array is undefined.
+         */
+        float optical_flow_feature_error[400];
+        
+        /* This is the window size to use to avoid the aperture problem (see slide
+         "Optical Flow: Overview"). */
+        Size optical_flow_window = Size(3,3);
+        
+        /* This termination criteria tells the algorithm to stop when it has either done
+         20 iterations or when
+         * epsilon is better than .3. You can play with these parameters for speed vs.
+         accuracy but these values
+         * work pretty well in many situations.
+         */
+        TermCriteria optical_flow_termination_criteria
+        = cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, .3 );
+        
     }
         return 0;
     
