@@ -10,6 +10,13 @@
 using namespace std;
 using namespace cv;
 
+static const double pi = 3.14159265358979323846;
+
+inline static double square(int a)
+{
+    return a * a;
+}
+
 /* This is just an inline that allocates images. I did this to reduce clutter in the
  * actual computer vision algorithmic code. Basically it allocates the requested image
  * unless that image is already non-NULL. It always leaves a non-NULL image as-is even
@@ -116,8 +123,7 @@ int main( int argc, char** argv )
         /* Get the second frame of video. Sample principles as the first. */
         //changed cvQueryFrame to input_video >> *frame, followed frame1_1C procedure
         input_video >> *frame;
-        if (frame == NULL)
-        {
+        if (frame == NULL) {
             fprintf(stderr, "Error: Hmm. The end came sooner than we thought.\n");
             return -1;
         }
@@ -157,8 +163,7 @@ int main( int argc, char** argv )
          * "number_of_features" will be set to a value <= 400 indicating the number of
          feature points found.
          */
-        goodFeaturesToTrack(frame1_1C, frame1_features, number_of_features, .01, .01);
-        
+        cv::goodFeaturesToTrack(*frame1_1C, frame1_features, number_of_features, .01, .01);
         /* Pyramidal Lucas Kanade Optical Flow! */
         /* This array will contain the locations of the points from frame 1 in frame 2. */
         Point frame2_features[400];
@@ -187,10 +192,107 @@ int main( int argc, char** argv )
          accuracy but these values
          * work pretty well in many situations.
          */
-        TermCriteria optical_flow_termination_criteria
-        = cvTermCriteria( CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, .3 );
+        TermCriteria optical_flow_termination_criteria = TermCriteria( TermCriteria::COUNT + TermCriteria::EPS, 20, .3 );
         
+        /* This is some workspace for the algorithm.
+         * (The algorithm actually carves the image into pyramids of different resolutions
+         .)
+         */
+        pyramid1->create(frame_size, CV_8U);
+        pyramid2->create( frame_size, CV_8U);
+        /* Actually run Pyramidal Lucas Kanade Optical Flow!!
+         * "frame1_1C" is the first frame with the known features.
+         * "frame2_1C" is the second frame where we want to find the first frame's
+         features.
+         * "pyramid1" and "pyramid2" are workspace for the algorithm.
+         * "frame1_features" are the features from the first frame.
+         * "frame2_features" is the (outputted) locations of those features in the second
+         frame.
+         * "number_of_features" is the number of features in the frame1_features array.
+         * "optical_flow_window" is the size of the window to use to avoid the aperture
+         problem.
+         * "5" is the maximum number of pyramids to use. 0 would be just one level.
+         * "optical_flow_found_feature" is as described above (non-zero iff feature found
+         by the flow).
+         * "optical_flow_feature_error" is as described above (error in the flow for this
+         feature).
+         * "optical_flow_termination_criteria" is as described above (how long the
+         algorithm should look).
+         * "0" means disable enhancements. (For example, the second aray isn't preinitialized
+         with guesses.)
+         */
+        cv::calcOpticalFlowPyrLK(*frame1_1C, *frame2_1C, frame1_features, frame2_features,
+                                 number_of_features, optical_flow_window, 5,
+                                 optical_flow_found_feature, optical_flow_feature_error,
+                                 optical_flow_termination_criteria, 0 );
+        
+        /* For fun (and debugging :)), let's draw the flow field. */
+        for(int i = 0; i < number_of_features; i++)
+        {
+            /* If Pyramidal Lucas Kanade didn't really find the feature, skip it. */
+            if ( optical_flow_found_feature[i] == 0 ) continue;
+            int line_thickness; line_thickness = 1;
+            /* CV_RGB(red, green, blue) is the red, green, and blue components
+             * of the color you want, each out of 255.
+             */
+            Scalar line_color;
+            line_color=Scalar(255,0,0);
+            /* Let's make the flow field look nice with arrows. */
+            /* The arrows will be a bit too short for a nice visualization because of the
+             high framerate
+             * (ie: there's not much motion between the frames). So let's lengthen them
+             by a factor of 3.
+             */
+            Point p,q;
+            p.x = (int) frame1_features[i].x;
+            p.y = (int) frame1_features[i].y;
+            q.x = (int) frame2_features[i].x;
+            q.y = (int) frame2_features[i].y;
+            double angle; angle = atan2( (double) p.y - q.y, (double) p.x - q.x );
+            double hypotenuse; hypotenuse = sqrt( square(p.y - q.y) + square(p.x - q.x) )
+            ;
+            /* Here we lengthen the arrow by a factor of three. */
+            q.x = (int) (p.x - 3 * hypotenuse * cos(angle));
+            q.y = (int) (p.y - 3 * hypotenuse * sin(angle));
+            /* Now we draw the main line of the arrow. */
+            /* "frame1" is the frame to draw on.
+             * "p" is the point where the line begins.
+             * "q" is the point where the line stops.
+             * "CV_AA" means antialiased drawing.
+             * "0" means no fractional bits in the center cooridinate or radius.
+             */
+            
+            cv::line( *frame1, p, q, line_color, line_thickness, LINE_AA, 0 );
+            /* Now draw the tips of the arrow. I do some scaling so that the
+             * tips look proportional to the main line of the arrow.
+             */
+            p.x = (int) (q.x + 9 * cos(angle + pi / 4));
+            p.y = (int) (q.y + 9 * sin(angle + pi / 4));
+            cv::line( *frame1, p, q, line_color, line_thickness, LINE_AA, 0 );
+            p.x = (int) (q.x + 9 * cos(angle - pi / 4));
+            p.y = (int) (q.y + 9 * sin(angle - pi / 4));
+            cv::line( *frame1, p, q, line_color, line_thickness, LINE_AA, 0 );
+        }
+        /* Now display the image we drew on. Recall that "Optical Flow" is the name of
+         * the window we created above.
+         */
+         imshow("Optical Flow", *frame1);
+        /* And wait for the user to press a key (so the user has time to look at the
+         image).
+         * If the argument is 0 then it waits forever otherwise it waits that number of
+         milliseconds.
+         * The return value is the key the user pressed.
+         */
+        int key_pressed;
+        key_pressed = waitKey(0);
+        /* If the users pushes "b" or "B" go back one frame.
+         * Otherwise go forward one frame.
+         */
+        if (key_pressed == 'b' || key_pressed == 'B') current_frame--;
+        else current_frame++;
+        /* Don't run past the front/end of the AVI. */
+        if (current_frame < 0) current_frame = 0;
+        if (current_frame >= number_of_frames - 1) current_frame = number_of_frames - 2;
     }
-        return 0;
-    
+    return 0;
 }
