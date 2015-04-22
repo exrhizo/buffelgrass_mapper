@@ -3,9 +3,17 @@
  * http://robots.stanford.edu/cs223b05/notes/CS%20223-B%20T1%20stavens_opencv_optical_flow.pdf
  */
 
+#include <cstdio>
 #include "opencv2/opencv.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
+
+#define CAP_PROP_FRAME_HEIGHT CV_CAP_PROP_FRAME_HEIGHT
+#define CAP_PROP_FRAME_WIDTH CV_CAP_PROP_FRAME_WIDTH
+#define CAP_PROP_POS_AVI_RATIO CV_CAP_PROP_POS_AVI_RATIO
+#define CAP_PROP_POS_FRAMES CV_CAP_PROP_POS_FRAMES
+#define CAP_PROP_POS_FRAMES CV_CAP_PROP_POS_FRAMES
+#define CAP_PROP_POS_FRAMES CV_CAP_PROP_POS_FRAMES
 
 using namespace std;
 using namespace cv;
