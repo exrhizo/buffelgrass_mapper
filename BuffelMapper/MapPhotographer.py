@@ -39,8 +39,9 @@ def main(api, output_dir=".", frequency=1,
     count = 0
     print "Using timestep %f" % time_step
 
-    while self.api.exit:
+    while not api.exit:
         if not v.armed:
+            gpx.save()
             time.sleep(1)
             continue
         #Give the correct update rate
@@ -59,7 +60,7 @@ def main(api, output_dir=".", frequency=1,
 
         pic_name = "{}-{}-{}.jpg".format(
             time.strftime("%Y:%m:%d %H:%M:%S"),
-            v.alt,
+            v.location.alt,
             v.groundspeed)
 
         print "{}: about to read frame".format(time.time())
@@ -83,5 +84,7 @@ def main(api, output_dir=".", frequency=1,
         if count%10:
             gpx.save()
         last_update = now
+
+    print "api.exit is true"
     cap.release()
     gpx.save()

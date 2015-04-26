@@ -27,15 +27,19 @@ class Gpx:
         self.gpx_file = gpx_file
         self.pkl_file = gpx_file+".pkl"
         self.track_points = []
+        self.has_new_points = False
 
     def addTrackPoint(self, point):
+        self.has_new_points = True
         self.track_points.append(point)
 
     def save(self):
-        with open(self.gpx_file, 'w') as f:
-            f.write(str(self))
-        with open(self.pkl_file, 'wb') as f:
-            f.write(pickle.dumps(self))
+        if self.has_new_points:            
+            with open(self.gpx_file, 'w') as f:
+                f.write(str(self))
+            with open(self.pkl_file, 'wb') as f:
+                f.write(pickle.dumps(self))
+            self.has_new_points = False
 
     def __str__(self):
         return self.GPX_BEGIN + \
