@@ -39,7 +39,10 @@ def main(api, output_dir=".", frequency=1,
     count = 0
     print "Using timestep %f" % time_step
 
-    while True:
+    while self.api.exit:
+        if not v.armed:
+            time.sleep(1)
+            continue
         #Give the correct update rate
         now = time.time()
         time_diff = now - last_update
@@ -51,10 +54,18 @@ def main(api, output_dir=".", frequency=1,
             print "REQUESTED TIMESTEP: %f" % time_step
             print "ACTUAL STEP:        %f" % time_diff
 
+        #Files are saved with this format:
+        #YYYY:MM:DD HH:MM:SS-elevation-speed.jpg
+
+        pic_name = "{}-{}-{}.jpg".format(
+            time.strftime("%Y:%m:%d %H:%M:%S"),
+            v.alt,
+            v.groundspeed)
+
         print "{}: about to read frame".format(time.time())
         ret, frame = cap.read()
-        print "{}: frame read. About to write image".format(time.time())
-        cv2.imwrite("{}/photo{}.jpg".format(output_dir, count), frame);
+        print "{}: frame read. About to write image {}".format(time.time(), pic_name)
+        cv2.imwrite("{}/{}".format(output_dir, pic_name), frame);
         print "{}: image writen. about to create TrackPoint".format(time.time())
 
         gpx.addTrackPoint(TrackPoint({
