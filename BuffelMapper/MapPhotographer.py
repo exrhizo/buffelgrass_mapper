@@ -15,8 +15,6 @@ import time
 from droneapi.lib import VehicleMode
 from pymavlink import mavutil
 
-import cPickle as pickle
-
 import cv2
 import numpy as np
 

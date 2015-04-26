@@ -1,3 +1,5 @@
+import cPickle as pickle
+
 class Gpx:
     """
     Class for managing the GPS Exchange format.
