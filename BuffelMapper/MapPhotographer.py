@@ -64,7 +64,7 @@ def main(api, output_dir=".", frequency=1,
             'lat':v.location.lat, #Decimal degrees
             'ele':v.location.alt, #Meters
             'time':time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            'course':v.attitude.yaw * 57.2957795, #degrees
+            'compass':v.attitude.yaw * 57.2957795, #degrees
             'speed':v.groundspeed})) # m/s
 
         print "{}: TrackPoint created".format(time.time())
