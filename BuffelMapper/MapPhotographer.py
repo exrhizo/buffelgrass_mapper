@@ -58,7 +58,7 @@ def main(api, output_dir=".", frequency=1,
         #Files are saved with this format:
         #YYYY:MM:DD HH:MM:SS-elevation-speed.jpg
 
-        pic_name = "{}-{0:.3f}-{0:.3f}.jpg".format(
+        pic_name = "{}-{:.3f}-{:.3f}.jpg".format(
             time.strftime("%Y:%m:%d %H:%M:%S"),
             v.location.alt,
             v.groundspeed)
