@@ -1,12 +1,15 @@
 import time
-import sys
+import sys, os
 #
 from droneapi.lib import VehicleMode
 from pymavlink import mavutil
 
 from pprint import pprint
 
+from Settings import settings
 from MapPhotographer import MapPhotographer
+
+from BuffelWeb.BuffelWeb import BuffelWebServer
 
 class BuffelMapper:
     def __init__(self, api, log_dir):
@@ -19,11 +22,22 @@ class BuffelMapper:
 
         self.log_dir = log_dir
 
+        self.map_picture_dir = os.path.join(log_dir, "map_pics")
+        if not os.path.exists(self.map_picture_dir):
+            os.makedirs(self.map_picture_dir)
+
+        self.web_static_dir = os.path.join(settings["buffel_root"], "BuffelWeb", "static")
+        self.web_static_picture = os.path.join(self.web_static_dir, "map_pic.jpg")
+
         self.last_update = time.time()
 
         self.vehicle.set_mavlink_callback(self.getTimeDifference)
 
-        self.map_photographer = MapPhotographer()
+        self.map_photographer = MapPhotographer(self.map_picture_dir)
+
+        self.web_server = BuffelWebServer(self.vehicle, self)
+
+        self.running = False
 
 
     def getTimeDifference(self, m):
@@ -63,9 +77,18 @@ class BuffelMapper:
 
     def loop(self):
         while not self.api.exit:
+            time.sleep(1)
+            self.map_photographer.updatePhotographList()
+            if self.map_photographer.photograph_list:
+                recent_pic = self.map_photographer.photograph_list[-1]
+                if os.path.exists(self.web_static_picture):
+                    os.remove(self.web_static_picture)
+                os.symlink(recent_pic, self.web_static_picture)
+
             if not self.vehicle.armed:
                 self.running = False
                 break
 
     def finish(self):
         self.map_photographer.stopBackground()
+        self.web_server.close()

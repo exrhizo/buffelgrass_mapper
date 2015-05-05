@@ -4,7 +4,9 @@ MapPhotographer
 Module for capturing images and saving them in a seperate process.
 """
 import time
-import sys
+import sys, os
+from multiprocessing import Process, Pipe
+import subprocess
 
 from droneapi.lib import VehicleMode
 from pymavlink import mavutil
@@ -18,11 +20,14 @@ import logging
 ################################################################################
 
 class MapPhotographer:
-    self.BACKGROUND_RUN = 1
-    self.BACKGROUND_PAUSE = 0
-    self.BACKGROUND_STOP = -1
-    def __init__(self):
+    BACKGROUND_RUN = 1
+    BACKGROUND_PAUSE = 0
+    BACKGROUND_STOP = -1
+
+    def __init__(self, picture_dir):
         self.time_step = 1.0 / settings["map_cam_freq"]
+
+        self.picture_dir = picture_dir
         
         self.background_started = False
 
@@ -63,9 +68,9 @@ class MapPhotographer:
         self.background_conn = background_conn
         self.last_update = time.time() - self.time_step
 
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, settings["map_cam_width"])
-        cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, settings["map_cam_height"])
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, settings["map_cam_width"])
+        self.cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, settings["map_cam_height"])
 
         self.background_running = not paused
 
@@ -73,7 +78,7 @@ class MapPhotographer:
         self.background_stop()
 
     def background_stop(self):
-        cap.release()
+        self.cap.release()
 
     def background_loop(self):
         ended = False
@@ -99,7 +104,7 @@ class MapPhotographer:
 
             now = time.time()
 
-            time_diff = now - last_update
+            time_diff = now - self.last_update
             if time_diff < self.time_step:
                 time.sleep(self.time_step - time_diff)
                 now = time.time()
@@ -112,8 +117,8 @@ class MapPhotographer:
             #Files are saved with this format:
             #YYYY:MM:DD HH:MM:SS-0-0.jpg
             date_time = time.strftime("%Y:%m:%d %H:%M:%S")
-            pic_file_path = sys.join(output_dir, "{}-0-0.jpg".format(date_time))
-            ret, frame = cap.read()
+            pic_file_path = os.path.join(self.picture_dir, "{}-0-0.jpg".format(date_time))
+            ret, frame = self.cap.read()
             cv2.imwrite(pic_file_path, frame);
             logging.info("Picture taken. %s", pic_file_path)
 
@@ -122,10 +127,11 @@ class MapPhotographer:
             
             self.background_conn.send(pic_file_path)
 
+            self.last_update = now
         
     def fixExif(self, file_path, date_time):
         command = ['exiftool',
-                   '-delete_original',
+                   '-overwrite_original',
                    '-focallength=%s' % str(settings["map_cam_focal_length"]),
                    '-DateTimeOriginal=%s' % date_time,
                    '-CreateDate=%s' % date_time,
@@ -139,4 +145,4 @@ class MapPhotographer:
         
         logging.info(out)
         if err:
-            logging.error(error)
+            logging.error(err)
