@@ -1,16 +1,10 @@
-#!/usr/bin/python
-
 """
-This is the basic code to collect map photographs and create the GPX file.
+MapPhotographer
 
-Based on code: 
-https://github.com/mavlink/mavlink/blob/master/pymavlink/tools/mavtogpx.py
-
+Module for capturing images and saving them in a seperate process.
 """
-
-#from __future__ import division
-import argparse
 import time
+import sys
 #
 from droneapi.lib import VehicleMode
 from pymavlink import mavutil
@@ -18,73 +12,130 @@ from pymavlink import mavutil
 import cv2
 import numpy as np
 
-from Gpx import Gpx, TrackPoint
+from Settings import settings
+import logging
 
 ################################################################################
 
-def main(api, output_dir=".", frequency=1,
-            width=640, height=480):
-    # get our vehicle - when running with mavproxy it only knows about one vehicle (for now)
-    print "RUNNING MapPhotographer.py"
-    v = api.get_vehicles()[0]
+class MapPhotographer:
+    self.BACKGROUND_RUN = 1
+    self.BACKGROUND_PAUSE = 0
+    self.BACKGROUND_STOP = -1
+    def __init__(self):
+        self.time_step = 1.0 / settings["map_cam_freq"]
+        
+        self.background_started = False
 
-    gpx = Gpx(output_dir+"/flight.gpx")
+        self.photograph_list = []
 
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, height)
+        logging.debug("Using MapPhotographer time_step: %f", self.time_step)
 
-    time_step = 1.0 / frequency
-    last_update = time.time() - time_step #don't trigger warning
-    count = 0
-    print "Using timestep %f" % time_step
+    def startBackground(self, paused=False):
+        if self.background_started:
+            self.parent_conn.send(self.BACKGROUND_RUN) #tell the subprocess to run
+        else:
+            self.background_started = True
+            self.parent_conn, background_conn = Pipe()
 
-    while not api.exit:
-        if not v.armed:
-            gpx.save()
-            time.sleep(1)
-            continue
-        #Give the correct update rate
-        now = time.time()
-        time_diff = now - last_update
-        if time_diff < time_step:
-            time.sleep(time_step - time_diff)
+            self.proc = Process(target=self.backround_start, args=(background_conn, paused))
+            self.proc.start()
+
+    def pauseBackground(self):
+        if self.background_started:
+            self.parent_conn.send(self.BACKGROUND_PAUSE) #tell the subprocess to pause
+        else:
+            logging.error("Unable to pause background photographer, process does not exist.")
+
+    def stopBackground(self):
+        if self.background_started:
+            self.parent_conn.send(self.BACKGROUND_STOP) #tell the subprocess to stop
+            self.background_started = False
+        else:
+            logging.error("Unable to pause background photographer, process does not exist.")
+
+    def updatePhotographList(self):
+        while self.parent_conn.poll():
+            m = self.parent_conn.recv()
+            logging.info("Recieved photo path: %s", str(m))
+            self.photograph_list.append(m)
+
+    def backround_start(self, background_conn, paused):
+        self.background_conn = background_conn
+        self.last_update = time.time() - self.time_step
+
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, settings["map_cam_width"])
+        cap.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, settings["map_cam_height"])
+
+        self.background_running = not paused
+
+        self.background_loop()
+        self.background_stop()
+
+    def background_stop(self):
+        cap.release()
+
+    def background_loop(self):
+        ended = False
+        while True:
+            # Read through all the messages.
+            while self.background_conn.poll():
+                m = self.background_conn.recv()
+                if m == self.BACKGROUND_STOP:
+                    ended = True
+                elif m == self.BACKGROUND_PAUSE:
+                    self.background_running = False
+                elif m == self.BACKGROUND_RUN:
+                    self.background_running = True
+                else:
+                    logging.debug("Unknown message sent to background: %s", str(m))
+
+            if not self.background_running:
+                time.sleep(1)
+                continue
+
+            if ended:
+                break
+
             now = time.time()
-        elif time_diff > 1.5 * time_step:
-            print "CANNOT MEET FREQUENCY REQUESTED"
-            print "REQUESTED TIMESTEP: %f" % time_step
-            print "ACTUAL STEP:        %f" % time_diff
+            time_diff = now - last_update
+            if time_diff < self.time_step:
+                time.sleep(self.time_step - time_diff)
+                now = time.time()
+            elif time_diff > 1.5 * self.time_step:
+                logging.error("CANNOT MEET FREQUENCY REQUESTED")
+                logging.error("REQUESTED TIMESTEP: %f", self.time_step)
+                logging.error("ACTUAL STEP:        %f", time_diff)
 
-        #Files are saved with this format:
-        #YYYY:MM:DD HH:MM:SS-elevation-speed.jpg
 
-        pic_name = "{}-{0:.3f}-{0:.3f}.jpg".format(
-            time.strftime("%Y:%m:%d %H:%M:%S"),
-            v.location.alt,
-            v.groundspeed)
+            #Files are saved with this format:
+            #YYYY:MM:DD HH:MM:SS-0-0.jpg
+            date_time = time.strftime("%Y:%m:%d %H:%M:%S")
+            pic_file_path = sys.join(output_dir, "{}-0-0.jpg".format(date_time))
+            ret, frame = cap.read()
+            cv2.imwrite(pic_file_path, frame);
+            logging.info("Picture taken. %s", pic_file_path)
 
-        print "{}: about to read frame".format(time.time())
-        ret, frame = cap.read()
-        print "{}: frame read. About to write image {}".format(time.time(), pic_name)
-        cv2.imwrite("{}/{}".format(output_dir, pic_name), frame);
-        print "{}: image writen. about to create TrackPoint".format(time.time())
+            self.fixExif(pic_file_path, date_time)
+            logging.info("Exif modified. %s", pic_file_path)
+            
+            self.background_conn.send(pic_file_path)
 
-        gpx.addTrackPoint(TrackPoint({
-            'lon':v.location.lon, #Decimal degrees
-            'lat':v.location.lat, #Decimal degrees
-            'ele':v.location.alt, #Meters
-            'time':time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            'compass':v.attitude.yaw * 57.2957795, #degrees
-            'speed':v.groundspeed})) # m/s
-
-        print "{}: TrackPoint created".format(time.time())
-
-        #End of Loop time and count
-        count += 1
-        if count%10:
-            gpx.save()
-        last_update = now
-
-    print "api.exit is true"
-    cap.release()
-    gpx.save()
+        
+    def fixExif(self, file_path, date_time):
+        command = ['exiftool',
+                   '-delete_original',
+                   '-focallength=%s' % str(settings["map_cam_focal_length"]),
+                   '-DateTimeOriginal=%s' % date_time,
+                   '-CreateDate=%s' % date_time,
+                   file_path
+                   ]
+        exif_proc = subprocess.Popen(command, 
+                            stdin = subprocess.PIPE,
+                            stdout = subprocess.PIPE,
+                            stderr = subprocess.PIPE)
+        out, err = exif_proc.communicate()
+        
+        logging.info(out)
+        if err:
+            logging.error(error)
