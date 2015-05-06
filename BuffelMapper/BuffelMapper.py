@@ -1,3 +1,18 @@
+"""
+BuffelMapper module is the top level controller that runs the MapPhotographer
+and runs the webserver.
+
+Run this from run.py using the droneapi in MavProxy.
+"""
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
+
+
 import time
 import sys, os
 #

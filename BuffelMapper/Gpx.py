@@ -1,3 +1,11 @@
+"""Class for descrbing a GPX file, for manual creation"""
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
 import cPickle as pickle
 
 class Gpx:

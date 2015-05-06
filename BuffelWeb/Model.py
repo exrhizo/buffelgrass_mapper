@@ -1,3 +1,15 @@
+"""
+Classes for use with genshi, these are the basic datastructres that are used to create
+populate the values of the templaes.
+"""
+
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
 import os
 
 from BuffelMapper.Settings import settings

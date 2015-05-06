@@ -1,3 +1,13 @@
+"""
+this script was created to fix issues where the GPX was not compatible with Palentier
+"""
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
 #!/usr/bin/python
 
 import sys, os

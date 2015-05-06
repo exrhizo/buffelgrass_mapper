@@ -2,6 +2,13 @@
 Simple module for storing all the settings in one place.
 """
 
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
 import os
 
 settings = {

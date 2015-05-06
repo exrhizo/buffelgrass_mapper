@@ -3,6 +3,13 @@ MapPhotographer
 
 Module for capturing images and saving them in a seperate process.
 """
+
+__author__ = "Alex Warren"
+__copyright__ = "Copyright 2015, Autonomous Mapping Project"
+__credits__ = ["Alex Warren", "Rachel Powers", "Thomas Schuker",
+                    "Travis Kibler", "Jesse Odle", "Jeremy Hibbs"]
+__license__ = "BSD 2"
+
 import time
 import sys, os
 from multiprocessing import Process, Pipe
